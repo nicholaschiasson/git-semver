@@ -1,5 +1,5 @@
 [package]
-name = "git-semver"
+name = "git-semversion"
 version = "0.0.0"
 authors = ["Nicholas Omer Chiasson <nicholasomerchiasson@gmail.com>"]
 edition = "2021"
@@ -11,6 +11,10 @@ repository = "https://github.com/nicholaschiasson/git-semver"
 keywords = ["git", "semver", "tag", "cli"]
 categories = ["command-line-utilities", "development-tools::build-utils"]
 rust-version = "1.78.0"
+
+[[bin]]
+name = "git-semver"
+path = "src/main.rs"
 
 [badges]
 github = { repository = "nicholaschiasson/git-semver" }
