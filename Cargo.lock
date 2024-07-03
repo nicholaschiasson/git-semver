@@ -133,7 +133,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-semver"
+name = "git-semversion"
 version = "0.0.0"
 dependencies = [
  "clap",

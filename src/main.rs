@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .references()?
         .flatten()
         .filter(Reference::is_tag)
-        .map(|reference| {
+        .filter_map(|reference| {
             let tag_target = reference.peel_to_tag().map(|tag| tag.target_id());
             let target = reference.target();
             let shorthand = reference.shorthand().map(Version::parse);
@@ -109,7 +109,6 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 _ => None,
             }
         })
-        .flatten()
         .flatten()
         .collect();
 
@@ -133,19 +132,17 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if head_shorthand == cli.main_branch {
         if let Some(increment) = cli.increment {
             tag.increment(increment);
+        } else if head_commit.parent(1).is_ok() {
+            let head_summary = head_commit
+                .summary()
+                .ok_or(Error::CommitSummaryWithoutIncrementLevel)?;
+            let increment_level = &commit_match_expression
+                .captures(head_summary)
+                .ok_or(Error::CommitSummaryWithoutIncrementLevel)?[1]
+                .parse::<IncrementLevel>()?;
+            tag.increment(*increment_level);
         } else {
-            if let Ok(_) = head_commit.parent(1) {
-                let head_summary = head_commit
-                    .summary()
-                    .ok_or(Error::CommitSummaryWithoutIncrementLevel)?;
-                let increment_level = &commit_match_expression
-                    .captures(head_summary)
-                    .ok_or(Error::CommitSummaryWithoutIncrementLevel)?[1]
-                    .parse::<IncrementLevel>()?;
-                tag.increment(*increment_level);
-            } else {
-                tag.increment(cli.default_increment);
-            }
+            tag.increment(cli.default_increment);
         }
     } else {
         tag.pre = semver_extra::semver::Prerelease::new(&format!(
