@@ -1,0 +1,23 @@
+[package]
+name = "git-semver"
+version = "0.0.0"
+authors = ["Nicholas Omer Chiasson <nicholasomerchiasson@gmail.com>"]
+edition = "2021"
+license = "MIT"
+description = "Generate a semantic versioning compliant tag for your HEAD commit."
+readme = "README.md"
+homepage = "https://github.com/nicholaschiasson/git-semver"
+repository = "https://github.com/nicholaschiasson/git-semver"
+keywords = ["git", "semver", "tag", "cli"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+rust-version = "1.78.0"
+
+[badges]
+github = { repository = "nicholaschiasson/git-semver" }
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+clap = { version = "4.5.7", features = ["derive"] }
+git2 = { version = "0.19.0", features = ["vendored-libgit2", "vendored-openssl"] }
+regex = "1.10.5"
+semver-extra = "0.2.4"

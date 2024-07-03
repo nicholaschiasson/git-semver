@@ -1,0 +1,6 @@
+---
+services:
+  git-semver:
+    build: .
+    volumes:
+      - .:/repo:ro
