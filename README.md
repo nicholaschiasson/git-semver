@@ -1,8 +1,8 @@
 # git-semver
 
 [![github](https://img.shields.io/badge/github-nicholaschiasson/git--semver-default?logo=github)](https://github.com/nicholaschiasson/git-semver)
-[![crates.io](https://img.shields.io/crates/v/git-semver?logo=rust)](https://crates.io/crates/git-semver)
-[![docs.rs](https://img.shields.io/docsrs/git-semver?logo=docs.rs)](https://docs.rs/git-semver)
+[![crates.io](https://img.shields.io/crates/v/git-semversion?logo=rust)](https://crates.io/crates/git-semversion)
+[![docs.rs](https://img.shields.io/docsrs/git-semversion?logo=docs.rs)](https://docs.rs/git-semversion)
 [![build](https://github.com/nicholaschiasson/git-semver/actions/workflows/build.yml/badge.svg)](https://github.com/nicholaschiasson/git-semver/actions/workflows/build.yml)
 [![license](https://img.shields.io/github/license/nicholaschiasson/git-semver?logo=opensourceinitiative&logoColor=white)](https://github.com/nicholaschiasson/git-semver?tab=MIT-1-ov-file#readme)
 
@@ -17,7 +17,7 @@ This project also publishes a binary application for use on the command line.
 For now, crates.io is the only place this is being distributed.
 
 ```
-cargo install git-semver
+cargo install git-semversion
 ```
 
 ### Usage
