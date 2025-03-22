@@ -132,7 +132,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     if head_shorthand == cli.main_branch {
         if let Some(increment) = cli.increment {
             tag.increment(increment);
-        } else if head_commit.parent(1).is_ok() {
+        } else if head_commit.parent(0).is_ok() {
             let head_summary = head_commit
                 .summary()
                 .ok_or(Error::CommitSummaryWithoutIncrementLevel)?;
