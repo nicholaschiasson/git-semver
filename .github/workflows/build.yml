@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4.2.2
       - name: Check
         run: cargo check --all-features --verbose
       - name: Format
@@ -39,7 +39,7 @@ jobs:
       version: ${{ steps.stamp.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4.2.2
       - name: Check semver bump
         id: check-semver
         run: |
@@ -88,7 +88,7 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           sed -i "s/version = \"0.0.0\"/version = \"${VERSION}\"/" Cargo.toml
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: 'Cargo.toml'
           path: 'Cargo.toml'
@@ -102,9 +102,9 @@ jobs:
     needs: [tag]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4.2.2
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v4.2.1
         with:
           name: 'Cargo.toml'
       - name: Build
@@ -120,7 +120,7 @@ jobs:
           cp target/release/${BINARY_NAME} ./
           tar czf ${RAW_BINARY_NAME}-${{ runner.os }}-${{ runner.arch }}.tar.gz ${BINARY_NAME}
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4.6.2
         with:
           path: '*.tar.gz'
 
@@ -130,9 +130,9 @@ jobs:
     needs: [tag]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4.2.2
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v4.2.1
         with:
           name: 'Cargo.toml'
       - name: Publish to crates.io
@@ -152,7 +152,7 @@ jobs:
     needs: [tag]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
@@ -220,7 +220,7 @@ jobs:
     needs: [tag, build]
     steps:
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v3.0.2
+        uses: actions/download-artifact@v4.2.1
       - name: Release
         uses: softprops/action-gh-release@v0.1.15
         with:
