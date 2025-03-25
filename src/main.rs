@@ -1,6 +1,6 @@
 use std::{
     char,
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     error,
     fmt::{Debug, Display},
 };
@@ -46,7 +46,6 @@ struct Cli {
 
 #[derive(Clone, Copy)]
 enum Error {
-    HeadWithSemverTag,
     CommitSummaryWithoutIncrementLevel,
 }
 
@@ -62,7 +61,6 @@ impl Debug for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::HeadWithSemverTag => f.write_str("HEAD already tagged with semver"),
             Error::CommitSummaryWithoutIncrementLevel => {
                 f.write_str("cannot derive version increment level from commit summary")
             }
@@ -84,13 +82,29 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let head_commit = head.peel_to_commit()?;
 
     let head_shorthand = head.shorthand_bytes().into_c_string()?.into_string()?;
+
     let head_short_id = head_commit
         .as_object()
         .short_id()?
         .into_c_string()?
         .into_string()?;
 
-    let commit_match_expression = Regex::new(cli.match_expression.as_str())?;
+    let mut head_is_main = false;
+
+    let mut main_branch = repository
+        .find_branch(&cli.main_branch, git2::BranchType::Local)
+        .map(|b| b.get().peel_to_commit())?;
+
+    while let Ok(commit) = main_branch {
+        if commit.id() == head_commit.id() {
+            head_is_main = true;
+            break;
+        }
+        if commit.time() < head_commit.time() {
+            break;
+        }
+        main_branch = commit.parent(0);
+    }
 
     let tags: HashMap<Oid, Version> = repository
         .references()?
@@ -113,43 +127,45 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .collect();
 
     let mut tag = Version::new(0, 0, 0);
+    let mut head_is_tagged = false;
 
-    let mut commits = VecDeque::from([head.peel_to_commit()?]);
+    let mut tag_commit = Ok(head_commit.clone());
 
-    while let Some(commit) = commits.pop_front() {
+    while let Ok(commit) = tag_commit {
         if let Some(t) = tags.get(&commit.id()) {
-            if head.target().map(|c| c == commit.id()).unwrap_or_default() {
-                return Err(Error::HeadWithSemverTag.into());
-            }
+            head_is_tagged = commit.id() == head_commit.id();
             tag = t.clone();
             break;
         }
-        if let Ok(parent_id) = commit.parent(0) {
-            commits.push_back(parent_id);
-        }
+        tag_commit = commit.parent(0);
     }
 
-    if head_shorthand == cli.main_branch {
-        if let Some(increment) = cli.increment {
-            tag.increment(increment);
-        } else if head_commit.parent(0).is_ok() {
-            let head_summary = head_commit
+    if !head_is_tagged {
+        let commit_match_expression = Regex::new(cli.match_expression.as_str())?;
+
+        if head_is_main {
+            let head_summary_increment = head_commit
                 .summary()
-                .ok_or(Error::CommitSummaryWithoutIncrementLevel)?;
-            let increment_level = &commit_match_expression
-                .captures(head_summary)
-                .ok_or(Error::CommitSummaryWithoutIncrementLevel)?[1]
-                .parse::<IncrementLevel>()?;
-            tag.increment(*increment_level);
+                .ok_or(Error::CommitSummaryWithoutIncrementLevel)
+                .map(|summary| {
+                    commit_match_expression
+                        .captures(summary)
+                        .ok_or(Error::CommitSummaryWithoutIncrementLevel)
+                        .map(|captures| captures[1].parse::<IncrementLevel>())
+                });
+            let increment_level = match (cli.increment, head_summary_increment) {
+                (Some(increment), _) => increment,
+                (_, Ok(Ok(Ok(increment)))) => increment,
+                _ => cli.default_increment,
+            };
+            tag.increment(increment_level);
         } else {
-            tag.increment(cli.default_increment);
+            tag.pre = semver_extra::semver::Prerelease::new(&format!(
+                "{}.{}",
+                slug(&cli.prerelease_id.unwrap_or(head_shorthand)),
+                cli.prerelease_revision.unwrap_or(head_short_id)
+            ))?;
         }
-    } else {
-        tag.pre = semver_extra::semver::Prerelease::new(&format!(
-            "{}.{}",
-            slug(&cli.prerelease_id.unwrap_or(head_shorthand)),
-            cli.prerelease_revision.unwrap_or(head_short_id)
-        ))?;
     }
 
     println!("{tag}");
