@@ -142,13 +142,17 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     };
 
-    // Determine the semver
+    // Determine the version
     if !head_is_tagged {
-        if head_is_main {
-            for &increment_level in increments.iter().flatten().rev() {
-                version.increment(increment_level);
-            }
-        } else {
+        for &increment_level in increments
+            .iter()
+            .skip(if head_is_main { 0 } else { 1 })
+            .flatten()
+            .rev()
+        {
+            version.increment(increment_level);
+        }
+        if !head_is_main {
             version.pre = semver_extra::semver::Prerelease::new(&format!(
                 "{}.{}",
                 slug(&cli.prerelease_id.unwrap_or(head_shorthand)),
