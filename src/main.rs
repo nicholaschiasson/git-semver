@@ -1,11 +1,6 @@
-use std::{
-    char,
-    collections::HashMap,
-    error,
-    fmt::{Debug, Display},
-};
+use std::{char, collections::HashMap, error, fmt::Debug};
 
-use git2::{IntoCString, Oid, Reference};
+use git2::{Commit, IntoCString, Oid, Reference};
 use regex::Regex;
 use semver_extra::{semver::Version, Increment, IncrementLevel};
 
@@ -42,33 +37,13 @@ struct Cli {
         default_value = r"^Merge .*(patch|minor|major)/[\w-]+"
     )]
     match_expression: String,
-}
 
-#[derive(Clone, Copy)]
-enum Error {
-    CommitSummaryWithoutIncrementLevel,
+    /// Skips commits that do not match the expression when incrementing the version from the previous tag.
+    /// Useful when not squashing merge commits, but only want to increment on the merge commit.
+    /// Note: HEAD commit is never skipped, even if it does not match the expression.
+    #[arg(short = 's', long)]
+    skip_unmatched_commits: bool,
 }
-
-impl Debug for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Error(\"")?;
-        Display::fmt(self, f)?;
-        f.write_str("\")")?;
-        Ok(())
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::CommitSummaryWithoutIncrementLevel => {
-                f.write_str("cannot derive version increment level from commit summary")
-            }
-        }
-    }
-}
-
-impl error::Error for Error {}
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let cli = Cli::parse();
@@ -95,6 +70,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .find_branch(&cli.main_branch, git2::BranchType::Local)
         .map(|b| b.get().peel_to_commit())?;
 
+    // Walk back from main branch ref until we find HEAD (or not).
+    // Determine if we are on the main branch.
     while let Ok(commit) = main_branch {
         if commit.id() == head_commit.id() {
             head_is_main = true;
@@ -106,6 +83,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         main_branch = commit.parent(0);
     }
 
+    // Build a dictionary of object IDs mapping to version tags.
     let tags: HashMap<Oid, Version> = repository
         .references()?
         .flatten()
@@ -126,41 +104,52 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .flatten()
         .collect();
 
-    let mut tag = Version::new(0, 0, 0);
+    let mut version = Version::new(0, 0, 0);
     let mut head_is_tagged = false;
+    let commit_match_expression = Regex::new(cli.match_expression.as_str())?;
+    let mut increments = Vec::new();
 
     let mut tag_commit = Ok(head_commit.clone());
 
+    // Walk back from HEAD until we find the most recent tag.
+    // Keep track of all of the version increments that need to be applied.
     while let Ok(commit) = tag_commit {
         if let Some(t) = tags.get(&commit.id()) {
             head_is_tagged = commit.id() == head_commit.id();
-            tag = t.clone();
+            version = t.clone();
             break;
         }
+        increments.push(determine_increment_level(
+            &commit,
+            &commit_match_expression,
+            cli.default_increment,
+            cli.skip_unmatched_commits,
+        ));
         tag_commit = commit.parent(0);
     }
 
-    if !head_is_tagged {
-        let commit_match_expression = Regex::new(cli.match_expression.as_str())?;
-
-        if head_is_main {
-            let head_summary_increment = head_commit
-                .summary()
-                .ok_or(Error::CommitSummaryWithoutIncrementLevel)
-                .map(|summary| {
-                    commit_match_expression
-                        .captures(summary)
-                        .ok_or(Error::CommitSummaryWithoutIncrementLevel)
-                        .map(|captures| captures[1].parse::<IncrementLevel>())
-                });
-            let increment_level = match (cli.increment, head_summary_increment) {
-                (Some(increment), _) => increment,
-                (_, Ok(Ok(Ok(increment)))) => increment,
-                _ => cli.default_increment,
-            };
-            tag.increment(increment_level);
+    // Override HEAD increment explicitly, or at least don't allow it to be skipped if unmatched.
+    if let Some(i) = increments.first_mut() {
+        *i = if let Some(increment) = cli.increment {
+            Some(increment)
         } else {
-            tag.pre = semver_extra::semver::Prerelease::new(&format!(
+            determine_increment_level(
+                &head_commit,
+                &commit_match_expression,
+                cli.default_increment,
+                false,
+            )
+        }
+    };
+
+    // Determine the semver
+    if !head_is_tagged {
+        if head_is_main {
+            for &increment_level in increments.iter().flatten().rev() {
+                version.increment(increment_level);
+            }
+        } else {
+            version.pre = semver_extra::semver::Prerelease::new(&format!(
                 "{}.{}",
                 slug(&cli.prerelease_id.unwrap_or(head_shorthand)),
                 cli.prerelease_revision.unwrap_or(head_short_id)
@@ -168,9 +157,27 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     }
 
-    println!("{tag}");
+    println!("{version}");
 
     Ok(())
+}
+
+fn determine_increment_level(
+    commit: &Commit,
+    commit_match_expression: &Regex,
+    default_increment: IncrementLevel,
+    skip_unmatched: bool,
+) -> Option<IncrementLevel> {
+    let commit_summary_increment = commit.summary().map(|summary| {
+        commit_match_expression
+            .captures(summary)
+            .map(|captures| captures[1].parse::<IncrementLevel>())
+    });
+    match (commit_summary_increment, skip_unmatched) {
+        (Some(Some(Ok(increment))), _) => Some(increment),
+        (_, false) => Some(default_increment),
+        (_, true) => None,
+    }
 }
 
 fn slug(s: &str) -> String {
