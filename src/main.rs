@@ -68,11 +68,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let mut main_branch = repository
         .find_branch(&cli.main_branch, git2::BranchType::Local)
-        .map(|b| b.get().peel_to_commit())?;
+        .map(|b| b.get().peel_to_commit());
 
     // Walk back from main branch ref until we find HEAD (or not).
     // Determine if we are on the main branch.
-    while let Ok(commit) = main_branch {
+    while let Ok(Ok(commit)) = main_branch {
         if commit.id() == head_commit.id() {
             head_is_main = true;
             break;
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         if commit.time() < head_commit.time() {
             break;
         }
-        main_branch = commit.parent(0);
+        main_branch = Ok(commit.parent(0));
     }
 
     // Build a dictionary of object IDs mapping to version tags.
