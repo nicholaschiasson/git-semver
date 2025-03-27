@@ -1,6 +1,6 @@
 use std::{char, collections::HashMap, error, fmt::Debug};
 
-use git2::{Commit, IntoCString, Oid, Reference};
+use git2::IntoCString;
 use regex::Regex;
 use semver_extra::{semver::Version, Increment, IncrementLevel};
 
@@ -84,10 +84,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 
     // Build a dictionary of object IDs mapping to version tags.
-    let tags: HashMap<Oid, Version> = repository
+    let tags: HashMap<git2::Oid, Version> = repository
         .references()?
         .flatten()
-        .filter(Reference::is_tag)
+        .filter(git2::Reference::is_tag)
         .filter_map(|reference| {
             let tag_target = reference.peel_to_tag().map(|tag| tag.target_id());
             let target = reference.target();
@@ -167,7 +167,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 fn determine_increment_level(
-    commit: &Commit,
+    commit: &git2::Commit,
     commit_match_expression: &Regex,
     default_increment: IncrementLevel,
     skip_unmatched: bool,
